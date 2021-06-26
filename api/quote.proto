@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package quote;
+
+service Quote {
+    rpc SubscribeOrderBook(SubscribeOrderBookRequest) returns (stream OrderBook);
+    rpc SubscribeTrade(SubscribeTradeRequest) returns (stream Trade);
+}
+
+message SubscribeOrderBookRequest {
+    repeated string symbols = 1;
+}
+
+message OrderBook {
+    string symbol = 1;
+    sint64 sequence = 2;
+    repeated OrderBookEntry bids = 3;
+    repeated OrderBookEntry asks = 4;
+}
+
+message OrderBookEntry {
+    string price = 1;
+    string quantity = 2;
+    string order_id = 3;
+}
+
+message SubscribeTradeRequest {
+    repeated string symbols = 1;
+}
+
+message Trade {
+    string symbol = 1;
+}
