@@ -6,7 +6,7 @@
 
 namespace coinbase {
 
-using decimal = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<8>>;
+using Decimal = boost::multiprecision::number<boost::multiprecision::cpp_dec_float<8>>;
 
 } // namespace coinbase
 

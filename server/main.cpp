@@ -5,6 +5,7 @@
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 
 #include "quote_service.h"
+#include "coinbase/client.h"
 
 int main() {
     std::string server_address = "0.0.0.0:8080";

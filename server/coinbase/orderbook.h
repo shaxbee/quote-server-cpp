@@ -13,8 +13,8 @@ namespace coinbase {
 // https://docs.pro.coinbase.com/#get-product-order-book
 struct OrderBook {
     struct Entry {
-        decimal price;
-        decimal size;
+        Decimal price;
+        Decimal size;
         std::string order_id;
 
         static Entry FromJSON(const boost::json::object& src);

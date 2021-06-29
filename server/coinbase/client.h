@@ -10,7 +10,7 @@ namespace coinbase {
 
 class BaseClient {
 public:
-   virtual Orderbook GetOrderbook(std::string product) = 0;
+   virtual OrderBook GetOrderbook(std::string product) = 0;
    virtual void SubscribeFull(std::vector<std::string> products) = 0;
 };
 
