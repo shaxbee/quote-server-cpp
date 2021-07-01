@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(FETCHCONTENT_QUIET OFF)
 
 project(quote-server)
 
 include(FetchContent)
+include(CTest)
 
 # Boost
 find_package(Boost 1.67.0 REQUIRED COMPONENTS "json")
@@ -38,6 +39,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
+list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/contrib)
+include(Catch)
+
 # Generate Quote GRPC bindings
 get_filename_component(QUOTE_PROTO "api/quote.proto" ABSOLUTE)
 get_filename_component(QUOTE_PROTO_PATH "${QUOTE_PROTO}" DIRECTORY)
@@ -56,7 +60,7 @@ add_custom_command(OUTPUT ${QUOTE_GRPC_SRC}
     )
 
 # Targets
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+# include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories("include")
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -64,7 +68,13 @@ add_library(quote_grpc ${QUOTE_GRPC_SRC})
 target_link_libraries(quote_grpc PRIVATE grpc++ libprotobuf)
 
 file(GLOB_RECURSE SERVER_SRC CONFIGURE_DEPENDS "server/*.h" "server/*.cpp")
+file(GLOB_RECURSE SERVER_TEST_SRC CONFIGURE_DEPENDS "server/*.t.cpp")
+
+list(REMOVE_ITEM SERVER_SRC ${SERVER_TEST_SRC})
 
 add_executable(server ${SERVER_SRC})
 target_link_libraries(server PRIVATE quote_grpc grpc++_reflection Boost::json)
 
+add_executable(server_test ${SERVER_TEST_SRC})
+target_link_libraries(server_test PRIVATE Catch2::Catch2 Boost::json)
+catch_discover_tests(server_test)
