@@ -4,13 +4,13 @@
 #include <thread>
 
 void QuoteServiceImpl::Start() {
-    worker = std::async(std::launch::async, [=] {
+    worker = std::async(std::launch::async, [this] {
         int sequence = 0;
         while(true) {
             quote::OrderBook v;
             v.set_sequence(sequence);
 
-            orderBook.Dispatch(v);
+            orderBook.dispatch(v);
 
             std::this_thread::sleep_for(std::chrono::seconds(1));
             sequence++;
@@ -23,10 +23,10 @@ void QuoteServiceImpl::Wait() {
 }
 
 grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, const quote::SubscribeOrderBookRequest* request, grpc::ServerWriter<quote::OrderBook>* writer) {
-    auto subscriber = orderBook.Subscribe();
+    auto subscriber = orderBook.subscribe();
 
     while (!context->IsCancelled()) {
-        auto [res, state] = subscriber->Pop(std::chrono::seconds(1));
+        auto [res, state] = subscriber->pop(std::chrono::seconds(1));
         switch (state) {
         case PopState::overflow:
             return grpc::Status(grpc::StatusCode::DEADLINE_EXCEEDED, "slow consumer");

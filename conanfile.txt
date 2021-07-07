@@ -1,0 +1,7 @@
+[requires]
+grpc/1.38.0
+boost/1.76.0
+catch2/2.13.6
+
+[generators]
+cmake

@@ -19,11 +19,11 @@ public:
 
     // Subscribe creates subscriber that dispatcher will forward values to.
     // When subscriber is destroyed then associated buffer is removed.
-    std::shared_ptr<Subscriber<T>> Subscribe();
+    std::shared_ptr<Subscriber<T>> subscribe();
 
     // Dispatch forwards values to all subscribers.
     // If subscriber was destroyed or has overflowed then associated buffer will be removed.
-    void Dispatch(const T& value);
+    void dispatch(const T& value);
 
 private:
     std::mutex mtx;
@@ -36,8 +36,8 @@ private:
 template<typename T>
 class Subscriber {
 public:
-    bool Push(const T& value);
-    template<typename Rep> PopResult<T> Pop(std::chrono::duration<Rep> timeout);
+    bool push(const T& value);
+    template<typename Rep> PopResult<T> pop(std::chrono::duration<Rep> timeout);
 
 private:
     friend class Dispatcher<T>;
@@ -49,7 +49,7 @@ private:
 };
 
 template<typename T>
-std::shared_ptr<Subscriber<T>> Dispatcher<T>::Subscribe() {
+std::shared_ptr<Subscriber<T>> Dispatcher<T>::subscribe() {
     std::unique_lock<std::mutex> lock(mtx);
 
     auto subscriber = std::shared_ptr<Subscriber<T>>(new Subscriber<T>{*this, size});
@@ -59,13 +59,13 @@ std::shared_ptr<Subscriber<T>> Dispatcher<T>::Subscribe() {
 }
 
 template<typename T> 
-void Dispatcher<T>::Dispatch(const T& value) {
+void Dispatcher<T>::dispatch(const T& value) {
     std::unique_lock<std::mutex> lock(mtx);
    
     // push message to subscribers, removing those that are expired or overflowed
     for (auto it = subscribers.cbegin(); it != subscribers.cend();) {
         auto subscriber = it->lock();
-        if (!subscriber || !subscriber->Push(value)) {
+        if (!subscriber || !subscriber->push(value)) {
             it = subscribers.erase(it);
         } else {
             it++;
@@ -74,14 +74,14 @@ void Dispatcher<T>::Dispatch(const T& value) {
 };
 
 template<typename T>
-bool Subscriber<T>::Push(const T& value) {
-    return buffer.Push(value);
+bool Subscriber<T>::push(const T& value) {
+    return buffer.push(value);
 }
 
 template<typename T> 
 template<typename Rep> 
-PopResult<T> Subscriber<T>::Pop(std::chrono::duration<Rep> timeout) {
-    return buffer.Pop(timeout);
+PopResult<T> Subscriber<T>::pop(std::chrono::duration<Rep> timeout) {
+    return buffer.pop(timeout);
 };
 
 #endif

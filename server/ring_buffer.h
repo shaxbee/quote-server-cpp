@@ -25,13 +25,13 @@ public:
 
     // Push value to the buffer
     // Return false if there is overflow
-    bool Push(const T& value);
+    bool push(const T& value);
 
     // Pop value from the buffer
     // Returns State::valid and value if value was retrieved within given timeout.
     // If buffer has overflow then State::overflow is returned immediately.
     // If no value was present before timeout expired then State::timeout is returned.
-    template<typename Rep> PopResult<T> Pop(std::chrono::duration<Rep> timeout);
+    template<typename Rep> PopResult<T> pop(std::chrono::duration<Rep> timeout);
 private:
     std::mutex mtx;
     std::condition_variable cv;
@@ -40,7 +40,7 @@ private:
 };
 
 template<typename T>
-bool RingBuffer<T>::Push(const T& value) {
+bool RingBuffer<T>::push(const T& value) {
     {
         std::unique_lock<std::mutex> lock(mtx);
 
@@ -60,7 +60,7 @@ bool RingBuffer<T>::Push(const T& value) {
 
 template<typename T> 
 template<typename Rep> 
-PopResult<T> RingBuffer<T>::Pop(std::chrono::duration<Rep> timeout) {
+PopResult<T> RingBuffer<T>::pop(std::chrono::duration<Rep> timeout) {
     std::unique_lock<std::mutex> lock(mtx);
 
     // exit immediately if ring buffer has been overflowed

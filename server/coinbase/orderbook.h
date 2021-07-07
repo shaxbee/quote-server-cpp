@@ -5,9 +5,7 @@
 #include <vector>
 #include <string>
 
-#include <boost/json.hpp>
-
-#include "decimal.h"
+#include "../decimal.h"
 
 namespace coinbase {
 
@@ -24,28 +22,14 @@ struct OrderBook {
     std::int64_t sequence;
     std::vector<Entry> bids;
     std::vector<Entry> asks;
+
+    bool operator==(const OrderBook&) const = default;
 };
 
-OrderBook tag_invoke(boost::json::value_to_tag<OrderBook>, boost::json::value const& src) {
-    return OrderBook{
-        .sequence = src.at("sequence").as_int64(),
-        .bids = boost::json::value_to<std::vector<OrderBook::Entry>>(src.at("bids")),
-        .asks = boost::json::value_to<std::vector<OrderBook::Entry>>(src.at("asks"))
-    };
-}
+OrderBook parse_orderbook(std::string data);
 
-std::ostream& operator<<(std::ostream& os, const OrderBook::Entry& entry) {
-    return os << std::setprecision(std::numeric_limits<Decimal>::max_digits10) << "{.price=\"" << entry.price << "\",.size=\"" << entry.size << "\",.order_id=\"" << entry.order_id << "\"}";
-}
-
-OrderBook::Entry tag_invoke(boost::json::value_to_tag<OrderBook::Entry>, boost::json::value const& src) {
-    auto arr = src.as_array();
-    return OrderBook::Entry{
-        .price = Decimal{boost::json::value_to<std::string>(arr.at(0))},
-        .size = Decimal{boost::json::value_to<std::string>(arr.at(1))},
-        .order_id = boost::json::value_to<std::string>(arr.at(2))
-    };
-}
+std::ostream& operator<<(std::ostream&, const OrderBook&);
+std::ostream& operator<<(std::ostream&, const OrderBook::Entry&);
 
 } // namespace coinbase
 
