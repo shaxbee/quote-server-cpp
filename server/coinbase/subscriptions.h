@@ -15,7 +15,12 @@ struct Subscriptions {
     std::vector<Channel> channels;
 };
 
+struct Subscribe {
+    std::vector<Channel> channels;
+};
+
 Subscriptions parse_subscriptions(std::string data);
+std::string serialize_subscribe(Subscribe subscribe);
 
 } // namespace coinbase
 

@@ -46,7 +46,7 @@ TEST_CASE( "OrderBook update", "[orderbook]" ) {
     }) );
 
     // remove order
-    orderbook.update(1, Order::Type::bid, Order{
+    orderbook.update(2, Order::Type::bid, Order{
         .id = "77c7c96d-f171-4695-831f-de3c8f6ed2d7", .price = Decimal{"1.0"}, .size = Decimal{"0.0"}
     });
 

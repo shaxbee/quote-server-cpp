@@ -24,10 +24,7 @@ static std::unordered_map<std::string, Full::Type> full_type_names = {
 } // anonymous namespace
 
 Full parse_full(std::string data) {
-    boost::json::parser p;
-    p.write(data);
-
-    return value_to<Full>(p.release());
+    return value_to<Full>(boost::json::parse(data));
 };
 
 Full tag_invoke(boost::json::value_to_tag<Full>, boost::json::value const& src) {

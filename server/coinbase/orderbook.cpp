@@ -5,10 +5,7 @@
 namespace coinbase {
 
 OrderBook parse_orderbook(std::string data) {
-    boost::json::parser p;
-    p.write(data);
-
-    return value_to<OrderBook>(p.release());  
+    return value_to<OrderBook>(boost::json::parse(data));  
 };
 
 OrderBook tag_invoke(boost::json::value_to_tag<OrderBook>, boost::json::value const& src) {

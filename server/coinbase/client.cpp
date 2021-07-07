@@ -93,8 +93,12 @@ void Client::subscribe_full(std::vector<std::string> products, std::function<voi
 
     stream.handshake(host, "/");
 
-    std::string msg = R"msg({"type": "subscribe", "channels": [{ "name": "full", "product_ids": ["BTC-USD"] }]})msg";
-    stream.write(net::buffer(std::string(msg)));
+    auto subscribe = serialize_subscribe({
+        .channels = {
+            {.name = "full", .product_ids = products}
+        },
+    });
+    stream.write(net::buffer(std::string(subscribe)));
 
     beast::flat_buffer buffer;
 
