@@ -9,6 +9,7 @@
 #include "dispatcher.h"
 #include "orderbook.h"
 #include "ring_buffer.h"
+#include "trade.h"
 
 #include "coinbase/client.h"
 #include "coinbase/full.h"
@@ -16,6 +17,7 @@
 struct Source {
     virtual bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) = 0;
     virtual std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook() = 0;
+    virtual std::shared_ptr<Subscriber<Trade>> subscribe_trade() = 0;
 
     virtual void run(const std::vector<std::string>& products) = 0;
     virtual bool ready() = 0;
@@ -26,6 +28,7 @@ public:
     FullVisitor(std::size_t buffer_size);
 
     PopResult<OrderBook::Update> pop_orderbook();
+    PopResult<Trade> pop_trade();
 
     void visit(const coinbase::Full& full, const coinbase::Received& received) override;
     void visit(const coinbase::Full& full, const coinbase::Open& open) override;
@@ -35,6 +38,7 @@ public:
 
 private:
     RingBuffer<OrderBook::Update> _orderbook_buffer;
+    RingBuffer<Trade> _trade_buffer;
 
     void push_orderbook_update(const coinbase::Full& full, OrderBook::Update&& update);
     void push_orderbook_entry(const coinbase::Full& full, OrderBook::Entry&& entry);
@@ -46,6 +50,7 @@ public:
 
     bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) override;
     std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook() override;
+    std::shared_ptr<Subscriber<Trade>> subscribe_trade() override;
 
     void run(const std::vector<std::string>& products) override;
     bool ready() override;
@@ -57,13 +62,15 @@ private:
     boost::log::sources::logger_mt& _logger;
     FullVisitor _full_visitor;
     Dispatcher<OrderBook::Update> _orderbook_dispatcher;
+    Dispatcher<Trade> _trade_dispatcher;
 
     std::unique_ptr<OrderBooks> _orderbooks;
     bool _ready;
 
     std::future<void> subscribe_full(const std::vector<std::string>& products);
     void fetch_orderbooks(const std::vector<std::string>& products);
-    void dispatch_orderbook_updates();
+    void dispatch_orderbook();
+    void dispatch_trade();
 };
 
 #endif

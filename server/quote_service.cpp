@@ -55,6 +55,27 @@ quote::OrderBook map_orderbook_update(const OrderBook::Update& src) {
     return dst;
 };
 
+quote::Trade map_trade(const Trade& src) {
+    quote::Trade dst;
+
+    dst.set_product_id(src.product_id);
+    dst.set_time(src.time);
+
+    switch (src.side) {
+    case Side::bid:
+        dst.set_side(quote::Side::BID); break;
+    case Side::ask:
+        dst.set_side(quote::Side::ASK); break;
+    };
+
+    dst.set_maker_order_id(src.maker_order_id);
+    dst.set_taker_order_id(src.taker_order_id);
+    dst.set_price(src.price.str());
+    dst.set_size(src.size.str());
+
+    return dst;
+};
+
 } // anonymous namespace
 
 QuoteServiceImpl::QuoteServiceImpl(Source& source): _source(source) {
@@ -67,7 +88,6 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
     };
 
     auto subscriber = _source.subscribe_orderbook();
-
     auto product_id = request->product_id();
 
     quote::OrderBook orderbook;
@@ -117,5 +137,29 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
 };
 
 grpc::Status QuoteServiceImpl::SubscribeTrade(grpc::ServerContext* context, const quote::SubscribeTradeRequest* request, grpc::ServerWriter<quote::Trade>* writer) {
-    return grpc::Status::OK;
+    if (!_source.ready()) {
+        return grpc::Status(grpc::StatusCode::UNAVAILABLE, "Unavailable");
+    };
+
+    auto subscriber = _source.subscribe_trade();
+
+    while (!context->IsCancelled()) {
+        auto [res, state] = subscriber->pop(std::chrono::seconds(1));
+
+        // slow consumer
+        if (state == PopState::overflow) {
+            return grpc::Status(grpc::StatusCode::DEADLINE_EXCEEDED, "slow consumer");
+        };
+
+        // no update received
+        if (state == PopState::timeout) {
+            continue;
+        };
+
+        if (!writer->Write(map_trade(*res))) {
+            break;   
+        };
+    };
+    
+    return grpc::Status::CANCELLED;
 };

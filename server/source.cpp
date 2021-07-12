@@ -32,7 +32,7 @@ OrderBook map_orderbook(const coinbase::OrderBook& src) {
 
 } // anonymous namespace
 
-FullVisitor::FullVisitor(std::size_t buffer_size): _orderbook_buffer(buffer_size) {
+FullVisitor::FullVisitor(std::size_t buffer_size): _orderbook_buffer{buffer_size}, _trade_buffer{buffer_size} {
 
 };
 
@@ -68,6 +68,16 @@ void FullVisitor::visit(const coinbase::Full& full, const coinbase::Match& match
         .order_id = match.maker_order_id,
         .size = -match.size,
     });
+
+    _trade_buffer.push({
+        .product_id = full.product_id,
+        .time = full.time,
+        .side = map_side(full.side),
+        .maker_order_id = match.maker_order_id,
+        .taker_order_id = match.taker_order_id,
+        .price = match.price,
+        .size = match.size,
+    });
 };
 
 void FullVisitor::visit(const coinbase::Full& full, const coinbase::Change& change) {
@@ -87,6 +97,10 @@ void FullVisitor::visit(const coinbase::Full& full, const coinbase::Change& chan
 PopResult<OrderBook::Update> FullVisitor::pop_orderbook() {
     return _orderbook_buffer.pop();
 };
+
+PopResult<Trade> FullVisitor::pop_trade() {
+    return _trade_buffer.pop();
+}
 
 void FullVisitor::push_orderbook_update(const coinbase::Full& full, OrderBook::Update&& update) {
     _orderbook_buffer.push({
@@ -108,7 +122,7 @@ void FullVisitor::push_orderbook_entry(const coinbase::Full& full, OrderBook::En
     };
 };
 
-CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::size_t subscriber_buffer_size, std::size_t channel_buffer_size): _logger(logger), _client(client), _full_visitor(channel_buffer_size), _orderbook_dispatcher(subscriber_buffer_size) {
+CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::size_t subscriber_buffer_size, std::size_t channel_buffer_size): _logger(logger), _client(client), _full_visitor(channel_buffer_size), _orderbook_dispatcher(subscriber_buffer_size), _trade_dispatcher(subscriber_buffer_size) {
 
 };
 
@@ -126,11 +140,15 @@ std::shared_ptr<Subscriber<OrderBook::Update>> CoinbaseSource::subscribe_orderbo
     return _orderbook_dispatcher.subscribe();
 };
 
+std::shared_ptr<Subscriber<Trade>> CoinbaseSource::subscribe_trade() {
+    return _trade_dispatcher.subscribe();
+};
+
 bool CoinbaseSource::ready() {
     std::unique_lock lock{_mtx};
 
     return _ready;
-}
+};
 
 void CoinbaseSource::run(const std::vector<std::string>& products) {
     std::vector<std::future<void>> tasks;
@@ -139,13 +157,8 @@ void CoinbaseSource::run(const std::vector<std::string>& products) {
 
     fetch_orderbooks(products);
 
-    tasks.emplace_back(std::async(std::launch::async, [this]() {
-        try {
-            dispatch_orderbook_updates();
-        } catch (...) {
-            std::throw_with_nested(std::runtime_error("dispatch_orderbook_updates() failed"));
-        };
-    }));
+    tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_orderbook(); }));
+    tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_trade(); }));
 
     while (tasks.size()) {
         for (auto it = tasks.begin(); it != tasks.end(); it++) {
@@ -164,10 +177,14 @@ void CoinbaseSource::run(const std::vector<std::string>& products) {
 };
 
 std::future<void> CoinbaseSource::subscribe_full(const std::vector<std::string>& products) {
+    try {
     auto&& res = _client.subscribe_full(products, [this](const auto& full){ _full_visitor.apply(full); });
     BOOST_LOG(_logger) << "subscribed to full channel";
 
     return std::move(res);
+    } catch (...) {
+        std::throw_with_nested(std::runtime_error("subscribe_full() failed"));
+    }
 };
 
 void CoinbaseSource::fetch_orderbooks(const std::vector<std::string>& products) {
@@ -185,18 +202,37 @@ void CoinbaseSource::fetch_orderbooks(const std::vector<std::string>& products) 
     _ready = true;
 };
 
-void CoinbaseSource::dispatch_orderbook_updates() {
-    while (true) {
-        auto [res, state] = _full_visitor.pop_orderbook();
-        if (state == PopState::overflow) {
-            throw std::invalid_argument("orderbook buffer overflow");
-        };
+void CoinbaseSource::dispatch_orderbook() {
+    try {
+        while (true) {
+            auto [res, state] = _full_visitor.pop_orderbook();
+            if (state == PopState::overflow) {
+                throw std::invalid_argument("orderbook buffer overflow");
+            };
 
-        auto update = _orderbooks->update(*res);
-        if (!update) {
-            continue;
-        };
+            auto update = _orderbooks->update(*res);
+            if (!update) {
+                continue;
+            };
 
-        _orderbook_dispatcher.dispatch(*update);
+            _orderbook_dispatcher.dispatch(*update);
+        };
+    } catch (...) {
+        std::throw_with_nested(std::runtime_error("dispatch_orderbook() failed"));
     };
 };
+
+void CoinbaseSource::dispatch_trade() {
+    try {
+        while (true) {
+            auto [res, state] = _full_visitor.pop_trade();
+            if (state == PopState::overflow) {
+                throw std::invalid_argument("trade buffer overflow");
+            };
+
+            _trade_dispatcher.dispatch(*res);
+        };
+    } catch (...) {
+        std::throw_with_nested(std::runtime_error("dispatch_trade() failed"));
+    };
+}
