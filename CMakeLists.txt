@@ -33,13 +33,6 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 add_library(quote_grpc STATIC ${QUOTE_GRPC_SRC})
 target_link_libraries(quote_grpc PUBLIC CONAN_PKG::grpc CONAN_PKG::protobuf)
 
-# file(GLOB SERVER_COINBASE_SRC CONFIGURE_DEPENDS "server/coinbase/*.h" "server/coinbase/*.cpp")
-# file(GLOB SERVER_COINBASE_TEST_SRC CONFIGURE_DEPENDS "server/coinbase/*.t.cpp")
-# list(REMOVE_ITEM SERVER_COINBASE_SRC ${SERVER_COINBASE_TEST_SRC})
-
-# add_library(server_coinbase STATIC ${SERVER_COINBASE_SRC})
-# target_link_libraries(server_coinbase PUBLIC CONAN_PKG::boost)
-
 file(GLOB_RECURSE SERVER_SRC CONFIGURE_DEPENDS "server/*.cpp" "server/*.h")
 file(GLOB_RECURSE SERVER_TEST_SRC CONFIGURE_DEPENDS "server/*.t.cpp")
 list(REMOVE_ITEM SERVER_SRC ${SERVER_TEST_SRC})

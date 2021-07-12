@@ -1,6 +1,5 @@
 #include "client.h"
 
-#include <iostream>
 #include <future>
 
 #include <boost/asio/connect.hpp>
@@ -40,7 +39,7 @@ OrderBook ClientImpl::get_orderbook(std::string product) {
     }
 
     // resolve https address
-    auto const results = resolver.resolve(rest_host, "https");
+    auto const results = resolver.resolve(rest_host, "443");
 
     // connect and perform ssl handshake
     beast::get_lowest_layer(stream).connect(results);
@@ -78,7 +77,7 @@ std::future<void> ClientImpl::subscribe_full(std::vector<std::string> products, 
     }
 
     // resolve https address
-    auto const results = resolver.resolve(websocket_host, "https");
+    auto const results = resolver.resolve(websocket_host, "443");
 
     // connect and perform ssl handshake
     auto ep = beast::get_lowest_layer(stream).connect(results);

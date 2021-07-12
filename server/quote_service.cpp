@@ -64,7 +64,9 @@ QuoteServiceImpl::QuoteServiceImpl(Source& source): _source(source) {
 grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, const quote::SubscribeOrderBookRequest* request, grpc::ServerWriter<quote::OrderBook>* writer) {
     if (!_source.ready()) {
         return grpc::Status(grpc::StatusCode::UNAVAILABLE, "Unavailable");
-    }
+    };
+
+    auto subscriber = _source.subscribe_orderbook();
 
     auto product_id = request->product_id();
 
@@ -83,7 +85,6 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
     }
 
     auto sequence = orderbook.sequence();
-    auto subscriber = _source.subscribe_orderbook();
 
     while (!context->IsCancelled()) {
         auto [res, state] = subscriber->pop(std::chrono::seconds(1));
@@ -100,8 +101,8 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
         
         auto update = *res;
 
-        // ignore updates with sequence less than orderbook sequence
-        if (update.sequence <= sequence) {
+        // ignore updates for different product_id and with sequence less than orderbook sequence
+        if (update.product_id != product_id || update.sequence <= sequence) {
             continue;
         }
 

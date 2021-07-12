@@ -1,6 +1,5 @@
 #include "full.h"
 
-#include <iostream>
 #include <unordered_map>
 
 #include <boost/json.hpp>

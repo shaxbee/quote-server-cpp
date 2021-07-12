@@ -4,6 +4,8 @@
 #include <future>
 #include <mutex>
 
+#include <boost/log/sources/logger.hpp>
+
 #include "dispatcher.h"
 #include "orderbook.h"
 #include "ring_buffer.h"
@@ -25,20 +27,22 @@ public:
 
     PopResult<OrderBook::Update> pop_orderbook();
 
-    void visit(const coinbase::Full& full, const coinbase::Open& open);
-    void visit(const coinbase::Full& full, const coinbase::Done& done);
-    void visit(const coinbase::Full& full, const coinbase::Match& match);
+    void visit(const coinbase::Full& full, const coinbase::Received& received) override;
+    void visit(const coinbase::Full& full, const coinbase::Open& open) override;
+    void visit(const coinbase::Full& full, const coinbase::Done& done) override;
+    void visit(const coinbase::Full& full, const coinbase::Match& match) override;
+    void visit(const coinbase::Full& full, const coinbase::Change& change) override;
 
 private:
     RingBuffer<OrderBook::Update> _orderbook_buffer;
 
-    void push_orderbook(const coinbase::Full& full, OrderBook::Update&& update);
-    void push_orderbook(const coinbase::Full& full, OrderBook::Entry&& entry);
+    void push_orderbook_update(const coinbase::Full& full, OrderBook::Update&& update);
+    void push_orderbook_entry(const coinbase::Full& full, OrderBook::Entry&& entry);
 };
 
 class CoinbaseSource: public Source {
 public:
-    CoinbaseSource(coinbase::Client& client, std::size_t subscriber_buffer_size = 32, std::size_t channel_buffer_size = 1024);
+    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::size_t subscriber_buffer_size = 32, std::size_t channel_buffer_size = 1024);
 
     bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) override;
     std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook() override;
@@ -48,7 +52,9 @@ public:
 
 private:
     std::mutex _mtx;
+
     coinbase::Client& _client;
+    boost::log::sources::logger_mt& _logger;
     FullVisitor _full_visitor;
     Dispatcher<OrderBook::Update> _orderbook_dispatcher;
 

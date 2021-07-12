@@ -110,6 +110,10 @@ std::optional<OrderBook::Update> OrderBooks::update(const OrderBook::Update& upd
 
     if (update.sequence <= orderbook.sequence()) {
         return std::nullopt;
+    };
+
+    if (update.sequence - orderbook.sequence() > 1) {
+        throw std::invalid_argument("invalid sequence");
     }
 
     return orderbook.update(update);
