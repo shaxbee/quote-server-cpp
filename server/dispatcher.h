@@ -81,7 +81,7 @@ bool Subscriber<T>::push(const T& value) {
 template<typename T> 
 template<typename Rep> 
 PopResult<T> Subscriber<T>::pop(std::chrono::duration<Rep> timeout) {
-    return buffer.pop(timeout);
+    return buffer.pop_wait(timeout);
 };
 
 #endif

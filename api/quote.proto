@@ -8,11 +8,11 @@ service Quote {
 }
 
 message SubscribeOrderBookRequest {
-    repeated string symbols = 1;
+    string product_id = 1;
 }
 
 message OrderBook {
-    string symbol = 1;
+    string product_id = 1;
     sint64 sequence = 2;
     repeated OrderBookEntry bids = 3;
     repeated OrderBookEntry asks = 4;
@@ -25,9 +25,9 @@ message OrderBookEntry {
 }
 
 message SubscribeTradeRequest {
-    repeated string symbols = 1;
+    string product_ids = 1;
 }
 
 message Trade {
-    string symbol = 1;
+    string product_id = 1;
 }

@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 
-#include "../decimal.h"
+#include "decimal.h"
 
 namespace coinbase {
 

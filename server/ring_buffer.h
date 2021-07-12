@@ -27,11 +27,13 @@ public:
     // Return false if there is overflow
     bool push(const T& value);
 
-    // Pop value from the buffer
+    PopResult<T> pop();
+
+    // Pop value from the buffer with timeout
     // Returns State::valid and value if value was retrieved within given timeout.
     // If buffer has overflow then State::overflow is returned immediately.
     // If no value was present before timeout expired then State::timeout is returned.
-    template<typename Rep> PopResult<T> pop(std::chrono::duration<Rep> timeout);
+    template<typename Rep> PopResult<T> pop_wait(std::chrono::duration<Rep> timeout);
 private:
     std::mutex mtx;
     std::condition_variable cv;
@@ -58,9 +60,26 @@ bool RingBuffer<T>::push(const T& value) {
     return true;
 }
 
+template<typename T>
+PopResult<T> RingBuffer<T>::pop() {
+    std::unique_lock<std::mutex> lock(mtx);
+
+    // exit immediately if ring buffer has been overflowed
+    if (write_pos - read_pos > data.size()) {
+        return {std::nullopt, PopState::overflow};
+    };
+
+    cv.wait(lock, [this]{ return read_pos != write_pos; });
+
+    auto res = data.at(read_pos % data.size());
+    read_pos++;
+
+    return {res, PopState::valid};
+}
+
 template<typename T> 
 template<typename Rep> 
-PopResult<T> RingBuffer<T>::pop(std::chrono::duration<Rep> timeout) {
+PopResult<T> RingBuffer<T>::pop_wait(std::chrono::duration<Rep> timeout) {
     std::unique_lock<std::mutex> lock(mtx);
 
     // exit immediately if ring buffer has been overflowed
@@ -69,7 +88,7 @@ PopResult<T> RingBuffer<T>::pop(std::chrono::duration<Rep> timeout) {
     };
 
     // wait till we have data to read
-    if (!cv.wait_for(lock, timeout, [&]{ return read_pos != write_pos; })) {
+    if (!cv.wait_for(lock, timeout, [this]{ return read_pos != write_pos; })) {
         return {std::nullopt, PopState::timeout};
     }
 

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <string>
 
 #include <boost/asio/io_context.hpp>
@@ -14,17 +15,17 @@
 
 namespace coinbase {
 
-struct BaseClient {
+struct Client {
    virtual OrderBook get_orderbook(std::string product) = 0;
-   virtual void subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback) = 0;
+   virtual std::future<void> subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback) = 0;
 };
 
-class Client: public BaseClient {
+class ClientImpl: public Client {
 public:
-   Client(boost::asio::io_context& ioc, std::string rest_host, std::string websocket_host);
+   ClientImpl(boost::asio::io_context& ioc, std::string rest_host, std::string websocket_host);
 
    virtual OrderBook get_orderbook(std::string product);
-   virtual void subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback);
+   virtual std::future<void> subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback);
 private:
    const std::string rest_host;
    const std::string websocket_host;

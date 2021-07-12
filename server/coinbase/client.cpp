@@ -1,6 +1,7 @@
 #include "client.h"
 
 #include <iostream>
+#include <future>
 
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -25,11 +26,11 @@ using tcp = boost::asio::ip::tcp;
 
 namespace coinbase {
 
-Client::Client(boost::asio::io_context& ioc, std::string rest_host, std::string websocket_host): rest_host(rest_host), websocket_host(websocket_host), ioc(ioc), sslc(ssl::context::sslv23), resolver(ioc) {
+ClientImpl::ClientImpl(boost::asio::io_context& ioc, std::string rest_host, std::string websocket_host): rest_host(rest_host), websocket_host(websocket_host), ioc(ioc), sslc(ssl::context::sslv23), resolver(ioc) {
     sslc.set_default_verify_paths();
 };
 
-OrderBook Client::get_orderbook(std::string product) {
+OrderBook ClientImpl::get_orderbook(std::string product) {
     beast::ssl_stream<beast::tcp_stream> stream(ioc, sslc);
 
     // setup SNI
@@ -67,7 +68,7 @@ OrderBook Client::get_orderbook(std::string product) {
     return parse_orderbook(res.body());
 };
 
-void Client::subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback) {
+std::future<void> ClientImpl::subscribe_full(std::vector<std::string> products, std::function<void(const Full&)> callback) {
     websocket::stream<beast::ssl_stream<beast::tcp_stream>> stream{ioc, sslc};
 
     // setup SNI
@@ -106,23 +107,28 @@ void Client::subscribe_full(std::vector<std::string> products, std::function<voi
     auto data = beast::buffers_to_string(buffer.cdata());
     parse_subscriptions(data);
 
-    while (true) {
-        buffer.clear();
-        stream.read(buffer);
+    // this fails due to stream going out of scope
+    return std::async(std::launch::async, [callback, stream = std::move(stream)]() mutable {
+        while (true) {
+            beast::flat_buffer buffer;
 
-        auto data = beast::buffers_to_string(buffer.cdata());
-        auto full = parse_full(data);
+            buffer.clear();
+            stream.read(buffer);
 
-        callback(full);
-    };
+            auto data = beast::buffers_to_string(buffer.cdata());
+            auto full = parse_full(data);
 
-    try {
-        stream.close(websocket::close_code::normal);
-    } catch (boost::beast::system_error exc) {
-        if (exc.code() != ssl::error::stream_truncated) {
-            throw exc;
+            callback(full);
         };
-    };
+
+        try {
+            stream.close(websocket::close_code::normal);
+        } catch (boost::beast::system_error exc) {
+            if (exc.code() != ssl::error::stream_truncated) {
+                throw exc;
+            };
+        };
+    });
 };
 
 } // namespace coinbase
