@@ -38,6 +38,7 @@ int main() {
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
 
     grpc::ServerBuilder builder;
+    builder.SetMaxSendMessageSize(10 * 1024 * 1024);
     builder.AddListeningPort(config.addr, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);
 
@@ -51,8 +52,8 @@ int main() {
 
 Config Config::from_env() {
     auto addr = std::getenv("QS_ADDR");
-    auto rest_endpoint = std::getenv("QS_REST_ENDPOINT");
-    auto websocket_endpoint = std::getenv("QS_WEBSOCKET_ENDPOINT");
+    auto rest_endpoint = std::getenv("QS_COINBASE_REST_ENDPOINT");
+    auto websocket_endpoint = std::getenv("QS_COINBASE_WEBSOCKET_ENDPOINT");
     auto raw_products = std::getenv("QS_PRODUCTS");
 
     std::vector<std::string> products;

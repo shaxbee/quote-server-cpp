@@ -9,22 +9,27 @@ Start server:
 docker run -p 8080:8080 shaxbee/quote-server-cpp
 ```
 
+Configuration:
+* `QS_ADDR` - server listen address (default: `0.0.0.0:8080`)
+* `QS_COINBASE_REST_ENDPOINT` - [Coinbase REST API](https://docs.pro.coinbase.com/#api) endpoint (default: `api-public.sandbox.pro.coinbase.com`)
+* `QS_COINBASE_WEBSOCKET_ENDPOINT` - [Coinbase Websocket Feed](https://docs.pro.coinbase.com/#websocket-feed) endpoint (default: `ws-feed-public.sandbox.pro.coinbase.com`)
+* `QS_PRODUCTS` - comma-separated list of products (default: `BTC-USD`)
 
 ## API
 
-Orderbook and trade updates are streamed over [GRPC](https://grpc.io) with API schema defined in `api/quote.proto`.
+Orderbook and trade updates are streamed over [GRPC](https://grpc.io) with API schema defined in [api/quote.proto](api/quote.proto).
 Server can be interacted with using tools like grpcurl, grpc_cli, evans or programatically by generating bindings in prefered language.
 
 ### Subscribe to orderbook
 
 ```
-grpc_cli call localhost:8080 quote.Quote.SubscribeOrderbook 'product_id: "BTC-USD"'
+grpcurl -max-msg-sz 10485760 -d '{"product_id": "BTC-USD"}' -plaintext localhost:8080 quote.Quote/SubscribeOrderBook
 ```
 
 ### Subscribe to trades
 
 ```
-grpc_cli call localhost:8080 quote.Quote.SubscribeTrade 'product_id: "BTC-USD"'
+grpcurl -max-msg-sz 10485760 -d '{"product_id": "BTC-USD"}' -plaintext localhost:8080 quote.Quote/SubscribeTrade
 ```
 
 ## Build
@@ -56,6 +61,11 @@ cmake --build build/
 ```
 
 ## Design
+
+### Missing features
+
+* Parallel fetching of orderbooks.
+* Aggregated orderbooks with prefixed depth.
 
 ### Layers
 

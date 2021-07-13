@@ -55,7 +55,7 @@ private:
 
 class CoinbaseSource: public Source {
 public:
-    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size = 32, std::size_t channel_buffer_size = 1024);
+    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size = 1024, std::size_t channel_buffer_size = 65536);
 
     bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) override;
     std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook(const std::string& product_id) override;
