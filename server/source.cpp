@@ -122,7 +122,11 @@ void FullVisitor::push_orderbook_entry(const coinbase::Full& full, OrderBook::En
     };
 };
 
-CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::size_t subscriber_buffer_size, std::size_t channel_buffer_size): _logger(logger), _client(client), _full_visitor(channel_buffer_size), _orderbook_dispatcher(subscriber_buffer_size), _trade_dispatcher(subscriber_buffer_size) {
+bool Source::find_product(const std::string& product_id) const {
+    return std::find(_products.begin(), _products.end(), product_id) != _products.end();
+}
+
+CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size, std::size_t channel_buffer_size): Source{products}, _logger{logger}, _client{client}, _full_visitor{channel_buffer_size}, _orderbook_dispatcher{subscriber_buffer_size}, _trade_dispatcher{subscriber_buffer_size} {
 
 };
 
@@ -136,12 +140,12 @@ bool CoinbaseSource::get_orderbook(const std::string& product_id, std::function<
     return _orderbooks->get(product_id, callback);
 };
 
-std::shared_ptr<Subscriber<OrderBook::Update>> CoinbaseSource::subscribe_orderbook() {
-    return _orderbook_dispatcher.subscribe();
+std::shared_ptr<Subscriber<OrderBook::Update>> CoinbaseSource::subscribe_orderbook(const std::string& product_id) {
+    return _orderbook_dispatcher.subscribe([=](const auto& orderbook) { return orderbook.product_id == product_id; });
 };
 
-std::shared_ptr<Subscriber<Trade>> CoinbaseSource::subscribe_trade() {
-    return _trade_dispatcher.subscribe();
+std::shared_ptr<Subscriber<Trade>> CoinbaseSource::subscribe_trade(const std::string& product_id) {
+    return _trade_dispatcher.subscribe([=](const auto& trade) { return trade.product_id == product_id; });
 };
 
 bool CoinbaseSource::ready() {
@@ -150,12 +154,12 @@ bool CoinbaseSource::ready() {
     return _ready;
 };
 
-void CoinbaseSource::run(const std::vector<std::string>& products) {
+void CoinbaseSource::run() {
     std::vector<std::future<void>> tasks;
 
-    tasks.emplace_back(subscribe_full(products));
+    tasks.emplace_back(subscribe_full());
 
-    fetch_orderbooks(products);
+    fetch_orderbooks();
 
     tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_orderbook(); }));
     tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_trade(); }));
@@ -176,9 +180,9 @@ void CoinbaseSource::run(const std::vector<std::string>& products) {
     };
 };
 
-std::future<void> CoinbaseSource::subscribe_full(const std::vector<std::string>& products) {
+std::future<void> CoinbaseSource::subscribe_full() {
     try {
-    auto&& res = _client.subscribe_full(products, [this](const auto& full){ _full_visitor.apply(full); });
+    auto&& res = _client.subscribe_full(products(), [this](const auto& full){ _full_visitor.apply(full); });
     BOOST_LOG(_logger) << "subscribed to full channel";
 
     return std::move(res);
@@ -187,10 +191,10 @@ std::future<void> CoinbaseSource::subscribe_full(const std::vector<std::string>&
     }
 };
 
-void CoinbaseSource::fetch_orderbooks(const std::vector<std::string>& products) {
+void CoinbaseSource::fetch_orderbooks() {
     std::unordered_map<std::string, OrderBook> orderbooks;
 
-    for (auto product: products) {
+    for (auto product: products()) {
         auto orderbook = _client.get_orderbook(product);
         orderbooks.emplace(product, map_orderbook(orderbook));
 

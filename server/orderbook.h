@@ -47,7 +47,7 @@ public:
     inline const Bids& bids() const { return _bids; }
     inline const Asks& asks() const { return _asks; }
 
-    // update performs atomic update  bids and asks
+    // update performs atomic update bids and asks
     // return value contains update orderbook sequence and actual price and size of entry
     //
     // if entry.price == 0 then price is looked up
@@ -67,7 +67,7 @@ private:
 
 class OrderBooks {
 public:
-    OrderBooks(std::unordered_map<std::string, OrderBook>&& data);
+    explicit OrderBooks(std::unordered_map<std::string, OrderBook>&& data);
 
     bool get(std::string product_id, std::function<void (const OrderBook&)> callback);
     std::optional<OrderBook::Update> update(const OrderBook::Update& update);

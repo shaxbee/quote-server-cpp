@@ -14,13 +14,22 @@
 #include "coinbase/client.h"
 #include "coinbase/full.h"
 
-struct Source {
-    virtual bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) = 0;
-    virtual std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook() = 0;
-    virtual std::shared_ptr<Subscriber<Trade>> subscribe_trade() = 0;
+class Source {
+public:
+    explicit Source(std::vector<std::string> products): _products{std::move(products)} { }
 
-    virtual void run(const std::vector<std::string>& products) = 0;
+    inline const std::vector<std::string>& products() const { return _products; };
+    bool find_product(const std::string& product) const;
+
+    virtual bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) = 0;
+    virtual std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook(const std::string& product_id) = 0;
+    virtual std::shared_ptr<Subscriber<Trade>> subscribe_trade(const std::string& product_id) = 0;
+
+    virtual void run() = 0;
     virtual bool ready() = 0;
+
+private:
+    const std::vector<std::string> _products;
 };
 
 class FullVisitor: public coinbase::FullVisitor {
@@ -46,13 +55,13 @@ private:
 
 class CoinbaseSource: public Source {
 public:
-    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::size_t subscriber_buffer_size = 32, std::size_t channel_buffer_size = 1024);
+    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size = 32, std::size_t channel_buffer_size = 1024);
 
     bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) override;
-    std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook() override;
-    std::shared_ptr<Subscriber<Trade>> subscribe_trade() override;
+    std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook(const std::string& product_id) override;
+    std::shared_ptr<Subscriber<Trade>> subscribe_trade(const std::string& product_id) override;
 
-    void run(const std::vector<std::string>& products) override;
+    void run() override;
     bool ready() override;
 
 private:
@@ -67,8 +76,8 @@ private:
     std::unique_ptr<OrderBooks> _orderbooks;
     bool _ready;
 
-    std::future<void> subscribe_full(const std::vector<std::string>& products);
-    void fetch_orderbooks(const std::vector<std::string>& products);
+    std::future<void> subscribe_full();
+    void fetch_orderbooks();
     void dispatch_orderbook();
     void dispatch_trade();
 };

@@ -32,7 +32,7 @@ int main() {
 
     boost::asio::io_context ioc;
     coinbase::ClientImpl client{ioc, config.rest_endpoint, config.websocket_endpoint};
-    CoinbaseSource source{logger, client};
+    CoinbaseSource source{logger, client, config.products};
     QuoteServiceImpl service(source);
 
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
@@ -44,7 +44,7 @@ int main() {
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     BOOST_LOG(logger) << "Server listening on " << config.addr;
 
-    std::async(std::launch::async, [&] { source.run({config.products}); }).get();
+    std::async(std::launch::async, [&] { source.run(); }).get();
 
     return 0;
 };

@@ -25,7 +25,7 @@ message OrderBookEntry {
 }
 
 message SubscribeTradeRequest {
-    string product_ids = 1;
+    string product_id = 1;
 }
 
 enum Side {

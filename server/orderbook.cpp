@@ -85,7 +85,6 @@ OrderBook::Update OrderBook::update(const Update& u) {
     };
 };
 
-
 OrderBooks::OrderBooks(std::unordered_map<std::string, OrderBook>&& data): _data{data} {
 
 };

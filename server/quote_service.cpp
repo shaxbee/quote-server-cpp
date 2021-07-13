@@ -87,8 +87,9 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
         return grpc::Status(grpc::StatusCode::UNAVAILABLE, "Unavailable");
     };
 
-    auto subscriber = _source.subscribe_orderbook();
     auto product_id = request->product_id();
+    auto subscriber = _source.subscribe_orderbook(product_id);
+
 
     quote::OrderBook orderbook;
     auto found = _source.get_orderbook(product_id, [&](auto src) {
@@ -121,8 +122,8 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
         
         auto update = *res;
 
-        // ignore updates for different product_id and with sequence less than orderbook sequence
-        if (update.product_id != product_id || update.sequence <= sequence) {
+        // ignore updates that are already in orderbook
+        if (update.sequence <= sequence) {
             continue;
         }
 
@@ -141,7 +142,13 @@ grpc::Status QuoteServiceImpl::SubscribeTrade(grpc::ServerContext* context, cons
         return grpc::Status(grpc::StatusCode::UNAVAILABLE, "Unavailable");
     };
 
-    auto subscriber = _source.subscribe_trade();
+
+    auto product_id = request->product_id();
+    if (!_source.find_product(product_id)) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "Product not found");
+    };
+
+    auto subscriber = _source.subscribe_trade(product_id);
 
     while (!context->IsCancelled()) {
         auto [res, state] = subscriber->pop(std::chrono::seconds(1));

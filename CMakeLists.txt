@@ -40,7 +40,6 @@ list(REMOVE_ITEM SERVER_SRC ${SERVER_TEST_SRC})
 list(TRANSFORM SERVER_TEST_SRC REPLACE "\.t\.cpp$" "\.cpp" OUTPUT_VARIABLE SERVER_TEST_DEP)
 list(APPEND SERVER_TEST_SRC ${SERVER_TEST_DEP})
 list(FILTER SERVER_TEST_SRC EXCLUDE REGEX "server/main\.cpp$")
-message(${SERVER_TEST_SRC})
 
 add_executable(server ${SERVER_SRC})
 target_link_libraries(server PRIVATE quote_grpc CONAN_PKG::grpc CONAN_PKG::boost)

@@ -19,7 +19,7 @@ public:
 
     // Subscribe creates subscriber that dispatcher will forward values to.
     // When subscriber is destroyed then associated buffer is removed.
-    std::shared_ptr<Subscriber<T>> subscribe();
+    std::shared_ptr<Subscriber<T>> subscribe(std::function<bool(const T&)> filter = [](const auto&) { return true; });
 
     // Dispatch forwards values to all subscribers.
     // If subscriber was destroyed or has overflowed then associated buffer will be removed.
@@ -42,17 +42,18 @@ public:
 private:
     friend class Dispatcher<T>;
 
-    Subscriber(Dispatcher<T>& dispatcher, std::size_t size) noexcept: dispatcher(dispatcher), buffer(size) {};
+    Subscriber(Dispatcher<T>& dispatcher, std::size_t size, std::function<bool(const T&)> filter) noexcept: dispatcher(dispatcher), buffer(size), filter(filter) {};
 
     Dispatcher<T>& dispatcher;
     RingBuffer<T> buffer;
+    std::function<bool(const T&)> filter;
 };
 
 template<typename T>
-std::shared_ptr<Subscriber<T>> Dispatcher<T>::subscribe() {
+std::shared_ptr<Subscriber<T>> Dispatcher<T>::subscribe(std::function<bool(const T&)> filter) {
     std::unique_lock<std::mutex> lock(mtx);
 
-    auto subscriber = std::shared_ptr<Subscriber<T>>(new Subscriber<T>{*this, size});
+    auto subscriber = std::shared_ptr<Subscriber<T>>(new Subscriber<T>{*this, size, filter});
     subscribers.insert(subscriber);
 
     return subscriber;
@@ -75,6 +76,10 @@ void Dispatcher<T>::dispatch(const T& value) {
 
 template<typename T>
 bool Subscriber<T>::push(const T& value) {
+    if (!filter(value)) {
+        return true;
+    };
+
     return buffer.push(value);
 }
 
