@@ -12,7 +12,7 @@ namespace {
     };
 } // anonymous namespace
 
-TEST_CASE( "OrderBook update", "[orderbook]" ) {
+TEST_CASE( "OrderBook", "[orderbook]" ) {
     std::vector<OrderBook::Entry> bids{
         {.order_id = "de43f91d-8db9-486e-868c-8389d2611ab0", .price = Decimal{"2.0"}, .size = Decimal{"1.0"}},
         {.order_id = "77c7c96d-f171-4695-831f-de3c8f6ed2d7", .price = Decimal{"1.0"}, .size = Decimal{"1.0"}},

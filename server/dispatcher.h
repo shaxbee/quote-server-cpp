@@ -9,10 +9,10 @@
 
 #include "ring_buffer.h"
 
-template<typename T>
+template <typename T>
 class Subscriber;
 
-template<typename T>
+template <typename T>
 class Dispatcher {
 public:
     Dispatcher(std::size_t size): size(size) { };
@@ -33,11 +33,12 @@ private:
 };
 
 
-template<typename T>
+template <typename T>
 class Subscriber {
 public:
-    bool push(const T& value);
-    template<typename Rep> PopResult<T> pop(std::chrono::duration<Rep> timeout);
+    bool push_back(const T& value);
+    PopResult<T> pop_front();
+    template <typename Rep> PopResult<T> pop_front_wait(std::chrono::duration<Rep> timeout);
 
 private:
     friend class Dispatcher<T>;
@@ -49,7 +50,7 @@ private:
     std::function<bool(const T&)> filter;
 };
 
-template<typename T>
+template <typename T>
 std::shared_ptr<Subscriber<T>> Dispatcher<T>::subscribe(std::function<bool(const T&)> filter) {
     std::unique_lock<std::mutex> lock(mtx);
 
@@ -57,16 +58,16 @@ std::shared_ptr<Subscriber<T>> Dispatcher<T>::subscribe(std::function<bool(const
     subscribers.insert(subscriber);
 
     return subscriber;
-}
+};
 
-template<typename T> 
+template <typename T> 
 void Dispatcher<T>::dispatch(const T& value) {
     std::unique_lock<std::mutex> lock(mtx);
    
     // push message to subscribers, removing those that are expired or overflowed
     for (auto it = subscribers.cbegin(); it != subscribers.cend();) {
         auto subscriber = it->lock();
-        if (!subscriber || !subscriber->push(value)) {
+        if (!subscriber || !subscriber->push_back(value)) {
             it = subscribers.erase(it);
         } else {
             it++;
@@ -74,19 +75,24 @@ void Dispatcher<T>::dispatch(const T& value) {
     }
 };
 
-template<typename T>
-bool Subscriber<T>::push(const T& value) {
+template <typename T>
+bool Subscriber<T>::push_back(const T& value) {
     if (!filter(value)) {
         return true;
     };
 
-    return buffer.push(value);
-}
+    return buffer.push_back(value);
+};
 
-template<typename T> 
-template<typename Rep> 
-PopResult<T> Subscriber<T>::pop(std::chrono::duration<Rep> timeout) {
-    return buffer.pop_wait(timeout);
+template <typename T>
+PopResult<T> Subscriber<T>::pop_front() {
+    return buffer.pop_front();
+};
+
+template <typename T> 
+template <typename Rep> 
+PopResult<T> Subscriber<T>::pop_front_wait(std::chrono::duration<Rep> timeout) {
+    return buffer.pop_front_wait(timeout);
 };
 
 #endif

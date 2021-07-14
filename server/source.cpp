@@ -3,6 +3,8 @@
 #include <boost/log/common.hpp>
 #include <boost/range/adaptors.hpp>
 
+#include "task_group.h"
+
 namespace {
 
 Side map_side(const std::string& src) {
@@ -32,7 +34,7 @@ OrderBook map_orderbook(const coinbase::OrderBook& src) {
 
 } // anonymous namespace
 
-FullVisitor::FullVisitor(std::size_t buffer_size): _orderbook_buffer{buffer_size}, _trade_buffer{buffer_size} {
+FullVisitor::FullVisitor(): _orderbook_buffer{}, _trade_buffer{} {
 
 };
 
@@ -69,7 +71,7 @@ void FullVisitor::visit(const coinbase::Full& full, const coinbase::Match& match
         .size = -match.size,
     });
 
-    _trade_buffer.push({
+    _trade_buffer.emplace_back({
         .product_id = full.product_id,
         .time = full.time,
         .side = map_side(full.side),
@@ -81,7 +83,7 @@ void FullVisitor::visit(const coinbase::Full& full, const coinbase::Match& match
 };
 
 void FullVisitor::visit(const coinbase::Full& full, const coinbase::Change& change) {
-        // market orders are never on orderbook and have price 0
+    // market orders are never on orderbook and have price 0
     if (!change.price) {
         // bump sequence
         push_orderbook_update(full, {});
@@ -94,18 +96,25 @@ void FullVisitor::visit(const coinbase::Full& full, const coinbase::Change& chan
     });
 }
 
-PopResult<OrderBook::Update> FullVisitor::pop_orderbook() {
-    return _orderbook_buffer.pop();
+OrderBook::Update FullVisitor::pop_orderbook() {
+    return _orderbook_buffer.pop_front();
 };
 
-PopResult<Trade> FullVisitor::pop_trade() {
-    return _trade_buffer.pop();
-}
+Trade FullVisitor::pop_trade() {
+    return _trade_buffer.pop_front();
+};
+
+void FullVisitor::discard_until(std::int64_t sequence) {
+    _orderbook_buffer.discard_until(sequence, [](auto sequence, const auto& update) { 
+        return sequence < update.sequence; 
+    });
+};
 
 void FullVisitor::push_orderbook_update(const coinbase::Full& full, OrderBook::Update&& update) {
-    _orderbook_buffer.push({
+    _orderbook_buffer.emplace_back({
         .product_id = full.product_id,
         .sequence = full.sequence,
+        .time = full.time,
         .bid = update.bid,
         .ask = update.ask,
     });
@@ -126,7 +135,7 @@ bool Source::find_product(const std::string& product_id) const {
     return std::find(_products.begin(), _products.end(), product_id) != _products.end();
 }
 
-CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size, std::size_t channel_buffer_size): Source{products}, _logger{logger}, _client{client}, _full_visitor{channel_buffer_size}, _orderbook_dispatcher{subscriber_buffer_size}, _trade_dispatcher{subscriber_buffer_size} {
+CoinbaseSource::CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size): Source{products}, _logger{logger}, _client{client}, _full_visitor{}, _orderbook_dispatcher{subscriber_buffer_size}, _trade_dispatcher{subscriber_buffer_size} {
 
 };
 
@@ -137,7 +146,7 @@ bool CoinbaseSource::get_orderbook(const std::string& product_id, std::function<
         return false;
     };
 
-    return _orderbooks->get(product_id, callback);
+    return _orderbooks.get(product_id, callback);
 };
 
 std::shared_ptr<Subscriber<OrderBook::Update>> CoinbaseSource::subscribe_orderbook(const std::string& product_id) {
@@ -155,71 +164,53 @@ bool CoinbaseSource::ready() {
 };
 
 void CoinbaseSource::run() {
-    std::vector<std::future<void>> tasks;
-
-    tasks.emplace_back(subscribe_full());
+    TaskGroup group;
+    group.emplace(subscribe_full());
 
     fetch_orderbooks();
 
-    tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_orderbook(); }));
-    tasks.emplace_back(std::async(std::launch::async, [this] { dispatch_trade(); }));
+    group.launch([this] { dispatch_orderbook(); });
+    group.launch([this] { dispatch_trade(); });
 
-    while (tasks.size()) {
-        for (auto it = tasks.begin(); it != tasks.end(); it++) {
-            auto& task = *it;
-
-            auto status = task.wait_for(std::chrono::milliseconds(100));
-            if (status != std::future_status::ready) {
-                continue;
-            };
-
-            task.get();
-
-            tasks.erase(it);
-        };
-    };
+    group.get();
 };
 
 std::future<void> CoinbaseSource::subscribe_full() {
-    try {
     auto&& res = _client.subscribe_full(products(), [this](const auto& full){ _full_visitor.apply(full); });
     BOOST_LOG(_logger) << "subscribed to full channel";
 
     return std::move(res);
-    } catch (...) {
-        std::throw_with_nested(std::runtime_error("subscribe_full() failed"));
-    }
 };
 
 void CoinbaseSource::fetch_orderbooks() {
-    std::unordered_map<std::string, OrderBook> orderbooks;
+    TaskGroup group;
 
     for (auto product: products()) {
-        auto orderbook = _client.get_orderbook(product);
-        orderbooks.emplace(product, map_orderbook(orderbook));
+        group.launch([this, product]() {
+            auto orderbook = _client.get_orderbook(product);
+            _orderbooks.emplace(std::string(product), map_orderbook(orderbook));
 
-        BOOST_LOG(_logger) << "retrieved orderbook " << product;
+            BOOST_LOG(_logger) << "retrieved orderbook " << product;
+        });
     };
 
+    group.get();
+
     std::unique_lock lock{_mtx};
-    _orderbooks = std::make_unique<OrderBooks>(std::move(orderbooks));
     _ready = true;
 };
 
 void CoinbaseSource::dispatch_orderbook() {
     try {
         while (true) {
-            auto [res, state] = _full_visitor.pop_orderbook();
-            if (state == PopState::overflow) {
-                throw std::invalid_argument("orderbook buffer overflow");
-            };
+            auto update = _full_visitor.pop_orderbook();
 
-            auto update = _orderbooks->update(*res);
-            if (!update) {
+            auto update_res = _orderbooks.update(update);
+            if (!update_res) {
                 continue;
             };
 
-            _orderbook_dispatcher.dispatch(*update);
+            _orderbook_dispatcher.dispatch(update_res.value());
         };
     } catch (...) {
         std::throw_with_nested(std::runtime_error("dispatch_orderbook() failed"));
@@ -229,14 +220,11 @@ void CoinbaseSource::dispatch_orderbook() {
 void CoinbaseSource::dispatch_trade() {
     try {
         while (true) {
-            auto [res, state] = _full_visitor.pop_trade();
-            if (state == PopState::overflow) {
-                throw std::invalid_argument("trade buffer overflow");
-            };
-
-            _trade_dispatcher.dispatch(*res);
+            auto trade = _full_visitor.pop_trade();
+            _trade_dispatcher.dispatch(trade);
         };
-    } catch (...) {
+    } catch (const std::exception& exc) {
+        BOOST_LOG(_logger) << exc.what();
         std::throw_with_nested(std::runtime_error("dispatch_trade() failed"));
     };
 }

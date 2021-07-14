@@ -26,6 +26,7 @@ public:
     struct Update {
         std::string product_id;
         std::int64_t sequence;
+        std::string time;
         std::optional<Entry> bid;
         std::optional<Entry> ask;
 
@@ -67,13 +68,15 @@ private:
 
 class OrderBooks {
 public:
-    explicit OrderBooks(std::unordered_map<std::string, OrderBook>&& data);
+    OrderBooks();
 
-    bool get(std::string product_id, std::function<void (const OrderBook&)> callback);
+    bool get(std::string product_id, std::function<void (const OrderBook&)> callback) const;
+
     std::optional<OrderBook::Update> update(const OrderBook::Update& update);
+    void emplace(std::string&& product_id, OrderBook&& orderbook);
 
 private:
-    std::shared_mutex _mtx;
+    mutable std::shared_mutex _mtx;
     std::unordered_map<std::string, OrderBook> _data;
 };
 

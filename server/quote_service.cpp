@@ -41,6 +41,7 @@ quote::OrderBook map_orderbook_update(const OrderBook::Update& src) {
 
     dst.set_product_id(src.product_id);
     dst.set_sequence(src.sequence);
+    dst.set_time(src.time);
 
     quote::OrderBookEntry* entry;
 
@@ -108,7 +109,7 @@ grpc::Status QuoteServiceImpl::SubscribeOrderBook(grpc::ServerContext* context, 
     auto sequence = orderbook.sequence();
 
     while (!context->IsCancelled()) {
-        auto [res, state] = subscriber->pop(std::chrono::seconds(1));
+        auto [res, state] = subscriber->pop_front_wait(std::chrono::seconds(1));
 
         // slow consumer
         if (state == PopState::overflow) {
@@ -151,7 +152,7 @@ grpc::Status QuoteServiceImpl::SubscribeTrade(grpc::ServerContext* context, cons
     auto subscriber = _source.subscribe_trade(product_id);
 
     while (!context->IsCancelled()) {
-        auto [res, state] = subscriber->pop(std::chrono::seconds(1));
+        auto [res, state] = subscriber->pop_front_wait(std::chrono::seconds(1));
 
         // slow consumer
         if (state == PopState::overflow) {
