@@ -64,7 +64,11 @@ cmake --build build/
 
 ### Missing features
 
-* Parallel fetching of orderbooks.
+* Implement [health check protocol](https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+* Discard full channel updates that happened before orderbook sequence.
+* Split full channel buffers by product_id.
+* Recover from disconnects.
+* Chunked orderbook snapshot to reduce single message size.
 * Aggregated orderbooks with prefixed depth.
 
 ### Layers
@@ -77,7 +81,9 @@ cmake --build build/
 
 To distribute messages across subscribers the Dispatcher is provided that pushes messages to buffered Subscribers.
 
-Ring buffer is used for message storage in Subscribers as well as buffering full channel.
+Ring buffer is used for message storage in Subscribers.
+
+Unbounded buffer is used for full channel processing.
 
 ### End-to-end dataflow
 

@@ -18,22 +18,23 @@ struct PopResult {
     PopState state;
 };
 
+// RingBuffer provides thread-safe buffer with bounded size
 template<typename T>
 class RingBuffer {
 public:
     RingBuffer(std::size_t size): data(size), write_pos(0), read_pos(0) {};
 
-    // Push value to the buffer
+    // Push value to the back of the buffer
     // Return false if there is overflow
-    bool push(const T& value);
+    bool push_back(const T& value);
 
-    PopResult<T> pop();
+    PopResult<T> pop_front();
 
     // Pop value from the buffer with timeout
     // Returns State::valid and value if value was retrieved within given timeout.
     // If buffer has overflow then State::overflow is returned immediately.
     // If no value was present before timeout expired then State::timeout is returned.
-    template<typename Rep> PopResult<T> pop_wait(std::chrono::duration<Rep> timeout);
+    template<typename Rep> PopResult<T> pop_front_wait(std::chrono::duration<Rep> timeout);
 private:
     std::mutex mtx;
     std::condition_variable cv;
@@ -42,7 +43,7 @@ private:
 };
 
 template<typename T>
-bool RingBuffer<T>::push(const T& value) {
+bool RingBuffer<T>::push_back(const T& value) {
     {
         std::unique_lock<std::mutex> lock(mtx);
 
@@ -61,7 +62,7 @@ bool RingBuffer<T>::push(const T& value) {
 }
 
 template<typename T>
-PopResult<T> RingBuffer<T>::pop() {
+PopResult<T> RingBuffer<T>::pop_front() {
     std::unique_lock<std::mutex> lock(mtx);
 
     // exit immediately if ring buffer has been overflowed
@@ -79,7 +80,7 @@ PopResult<T> RingBuffer<T>::pop() {
 
 template<typename T> 
 template<typename Rep> 
-PopResult<T> RingBuffer<T>::pop_wait(std::chrono::duration<Rep> timeout) {
+PopResult<T> RingBuffer<T>::pop_front_wait(std::chrono::duration<Rep> timeout) {
     std::unique_lock<std::mutex> lock(mtx);
 
     // exit immediately if ring buffer has been overflowed

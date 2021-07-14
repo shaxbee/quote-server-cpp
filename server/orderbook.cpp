@@ -85,11 +85,11 @@ OrderBook::Update OrderBook::update(const Update& u) {
     };
 };
 
-OrderBooks::OrderBooks(std::unordered_map<std::string, OrderBook>&& data): _data{data} {
+OrderBooks::OrderBooks() {
 
 };
 
-bool OrderBooks::get(std::string product_id, std::function<void (const OrderBook&)> callback) {
+bool OrderBooks::get(std::string product_id, std::function<void (const OrderBook&)> callback) const {
     auto lock = std::shared_lock(_mtx);
 
     auto it = _data.find(product_id);
@@ -117,3 +117,9 @@ std::optional<OrderBook::Update> OrderBooks::update(const OrderBook::Update& upd
 
     return orderbook.update(update);
 };
+
+void OrderBooks::emplace(std::string&& product_id, OrderBook&& orderbook) {
+    std::unique_lock lock(_mtx);
+
+    _data.emplace(std::move(product_id), std::move(orderbook));
+}

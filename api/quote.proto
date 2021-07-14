@@ -14,8 +14,9 @@ message SubscribeOrderBookRequest {
 message OrderBook {
     string product_id = 1;
     sint64 sequence = 2;
-    repeated OrderBookEntry bids = 3;
-    repeated OrderBookEntry asks = 4;
+    string time = 3;
+    repeated OrderBookEntry bids = 4;
+    repeated OrderBookEntry asks = 5;
 }
 
 message OrderBookEntry {

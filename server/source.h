@@ -8,7 +8,7 @@
 
 #include "dispatcher.h"
 #include "orderbook.h"
-#include "ring_buffer.h"
+#include "buffer.h"
 #include "trade.h"
 
 #include "coinbase/client.h"
@@ -34,10 +34,12 @@ private:
 
 class FullVisitor: public coinbase::FullVisitor {
 public:
-    FullVisitor(std::size_t buffer_size);
+    FullVisitor();
 
-    PopResult<OrderBook::Update> pop_orderbook();
-    PopResult<Trade> pop_trade();
+    OrderBook::Update pop_orderbook();
+    Trade pop_trade();
+
+    void discard_until(std::int64_t sequence);
 
     void visit(const coinbase::Full& full, const coinbase::Received& received) override;
     void visit(const coinbase::Full& full, const coinbase::Open& open) override;
@@ -46,8 +48,8 @@ public:
     void visit(const coinbase::Full& full, const coinbase::Change& change) override;
 
 private:
-    RingBuffer<OrderBook::Update> _orderbook_buffer;
-    RingBuffer<Trade> _trade_buffer;
+    Buffer<OrderBook::Update> _orderbook_buffer;
+    Buffer<Trade> _trade_buffer;
 
     void push_orderbook_update(const coinbase::Full& full, OrderBook::Update&& update);
     void push_orderbook_entry(const coinbase::Full& full, OrderBook::Entry&& entry);
@@ -55,7 +57,7 @@ private:
 
 class CoinbaseSource: public Source {
 public:
-    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size = 1024, std::size_t channel_buffer_size = 65536);
+    CoinbaseSource(boost::log::sources::logger_mt& logger, coinbase::Client& client, std::vector<std::string> products, std::size_t subscriber_buffer_size = 1024);
 
     bool get_orderbook(const std::string& product_id, std::function<void (const OrderBook&)> callback) override;
     std::shared_ptr<Subscriber<OrderBook::Update>> subscribe_orderbook(const std::string& product_id) override;
@@ -73,7 +75,7 @@ private:
     Dispatcher<OrderBook::Update> _orderbook_dispatcher;
     Dispatcher<Trade> _trade_dispatcher;
 
-    std::unique_ptr<OrderBooks> _orderbooks;
+    OrderBooks _orderbooks;
     bool _ready;
 
     std::future<void> subscribe_full();
